@@ -6,6 +6,7 @@
 #include <unistd.h>     // for close()
 
 #include "Common/Structures.h"
+#include "User/User.h"
 
 void DieWithError( const char *errorMessage ) // External error handling function
 {
@@ -15,16 +16,6 @@ void DieWithError( const char *errorMessage ) // External error handling functio
 
 int main( int argc, char *argv[] )
 {
-    size_t nread;
-    int sock;                        // Socket descriptor
-
-    struct sockaddr_in echoServAddr; // Echo server address
-    struct sockaddr_in fromAddr;     // Source address of echo
-
-    unsigned short echoServPort;     // Echo server port
-    unsigned int fromSize;           // In-out of address size for recvfrom()
-    char *servIP;                    // IP address of server
-
 
     if (argc < 3)    // Test for correct number of arguments
     {
@@ -32,26 +23,29 @@ int main( int argc, char *argv[] )
         exit( 1 );
     }
 
-    servIP = argv[ 1 ];  // First arg: server IP address (dotted decimal)
-    echoServPort = atoi( argv[2] );  // Second arg: Use given port
-    printf( "client: Arguments passed: server IP %s, port %d\n", servIP, echoServPort );
+    User user(
+        argv[1],      // First arg: Server IP addr
+        atoi(argv[2]) // Second arg: Server port
+    );
 
-    // Create a datagram/UDP socket
-    if( ( sock = socket( PF_INET, SOCK_DGRAM, IPPROTO_UDP ) ) < 0 )
-        DieWithError( "client: socket() failed" );
-
-    // Construct the server address structure
-    memset( &echoServAddr, 0, sizeof( echoServAddr ) ); // Zero out structure
-    echoServAddr.sin_family = AF_INET;                  // Use internet addr family
-    echoServAddr.sin_addr.s_addr = inet_addr( servIP ); // Set server's IP address
-    echoServAddr.sin_port = htons( echoServPort );      // Set server's port
-
-    Protocol::Message m = {
+    std::cout << "sending registration" << std::endl;
+    Protocol::Message reg = {
         .command = Protocol::TrackerClientCommands::Register,
-        .argList = {"@handle", "127.0.0.1"}, //Bad data
-    };
-    m.sendMessage(sock, echoServAddr);
+        .argList = {"handle2", "ip", "1024", "69"}};
+    reg.sendMessage(sock, echoServAddr);
+    Protocol::Message rr;
+    rr.getIncomingMessage(sock, echoServAddr);
+    std::cout << rr.argList.at(0);
+
     
+    std::cout << "sending follow" << std::endl;
+    Protocol::Message m = {
+        .command = Protocol::TrackerClientCommands::Follow,
+        .argList = {"follow", "handle2", "handle"}};
+    m.sendMessage(sock, echoServAddr);
+
+
+
     close( sock );
     exit( 0 );
 }
