@@ -50,10 +50,10 @@ void Server::sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode cod
 {
 
     std::vector<std::string> args = {
-        Protocol::ReturnCodeToStrMap.at(code)                                       // Serializes the enum to a string
-    };                                                                              // Default nothing else is sent except for the code type
-    if (code == Protocol::ReturnCode::ARBITRARY && additionalData != std::vector<std::string> ()) // Additional data is present
-        args.insert(args.end(), additionalData.begin(), additionalData.end());                                             // Insert additional vector array after return code type
+        Protocol::ReturnCodeToStrMap.at(code)                                                    // Serializes the enum to a string
+    };                                                                                           // Default nothing else is sent except for the code type
+    if (code == Protocol::ReturnCode::ARBITRARY && additionalData != std::vector<std::string>()) // Additional data is present
+        args.insert(args.end(), additionalData.begin(), additionalData.end());                   // Insert additional vector array after return code type
 
     // Set up return code struct
     Protocol::Message returnCode = {
@@ -111,11 +111,12 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
     }
     break;
 
-    case Protocol::TrackerClientCommands::QueryHandles: {
-        //Querys handles registered with tracker
-        //Query Handles argument list: None
-        //Query Handles return list: [# of handles] [handle 1] [handle 2] [handle 3] [handle #]
-        //  Alt return list for 0 handles: [0]
+    case Protocol::TrackerClientCommands::QueryHandles:
+    {
+        // Querys handles registered with tracker
+        // Query Handles argument list: None
+        // Query Handles return list: [# of handles] [handle 1] [handle 2] [handle 3] [handle #]
+        //   Alt return list for 0 handles: [0]
 
         std::vector<std::string> registeredHandles;
         registeredHandles.push_back(std::to_string(
@@ -125,6 +126,50 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
         sendReturnCode(clientAddress, Protocol::ReturnCode::ARBITRARY, registeredHandles);
     }
     break;
+
+    case Protocol::TrackerClientCommands::Follow:
+    {
+        // Follow arg list: [original handle] [handle to follow]
+        // Return: SUCCESS if possible, FAILURE if not registered
+
+        if (message.argList.size() < 2)
+        {
+            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " sent malformed [follow] request" << std::endl;
+            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
+            break;
+        }
+
+        std::string handle = message.argList.at(0);
+        std::string handleToFollow = message.argList.at(1);
+
+        if (handleLookupTable.find(handle) != handleLookupTable.end())
+        {
+            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " attempted to [follow] with a handle that was not already registered (" << message.argList.at(0) << ")" << std::endl;
+            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            break;
+        }
+
+        if (handleLookupTable.find(handleToFollow) != handleLookupTable.end())
+        {
+            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " attempted to [follow] a handle that was not already registered (" << message.argList.at(0) << ")" << std::endl;
+            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            break;
+        }
+        auto &handleUserInformation = handleLookupTable[handle];
+
+        auto it = std::upper_bound(std::begin(handleUserInformation.followers), std::end(handleUserInformation.followers), handleToFollow,
+                                   [](auto const &a, auto const &b)
+                                   {
+                                       return a.compare(b) < 0; //Find the position where inserting would be in alphabetical order
+                                   });
+        handleUserInformation.followers.insert(it, handleToFollow);
+
+        std::cout << "followers\n";
+        for (const auto i : handleLookupTable.at(handle).followers)
+        {
+            std::cout << i << std::endl;
+        }
+    }
 
     default:
         break;

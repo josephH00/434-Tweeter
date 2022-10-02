@@ -13,6 +13,7 @@ class Server
 {
 public:
     Server(int serverPort);
+    ~Server() { close( sock ); }
     void run();
 
 private:
@@ -32,6 +33,7 @@ private:
     { // The associated user information needed to register a new user
         std::string ipv4Addr;
         std::vector<int> communicationPorts;
+        std::vector<std::string> followers; //Sorted list of who follows what handle
     };
     std::map<std::string, UserEntry> handleLookupTable; // This stores the key-value pairs of all the registered users by [@handle, {Registration information}]
 };
