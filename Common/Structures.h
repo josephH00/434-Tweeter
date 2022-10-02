@@ -88,15 +88,15 @@ namespace Protocol
             std::string strIncomingMessage = std::string(cStrIncomingMessage); // Can't delete before it's used
             delete[] cStrIncomingMessage;
 
-            parseIncoming(strIncomingMessage);
+            parseIncoming(strIncomingMessage, ',');
         }
 
-        void parseIncoming(std::string inStr)
+        void parseIncoming(std::string inStr, char delim)
         {
             std::stringstream ss(inStr);
 
             std::string msgCommand;
-            getline(ss, msgCommand, ',');
+            getline(ss, msgCommand, delim);
 
             for (const auto &[key, value] : TrackerToStrMap) // Reverse search the message's string to a tracker command enum value
                 if (msgCommand == value)
@@ -106,7 +106,7 @@ namespace Protocol
             while (ss.good())
             {
                 std::string substr;
-                getline(ss, substr, ',');
+                getline(ss, substr, delim);
 
                 if (substr != "") // Avoid extra whitespace
                     argList.push_back(substr);
