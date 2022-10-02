@@ -6,6 +6,7 @@
 #include <unistd.h>     // for close()
 #include <cstdlib>
 
+#include <algorithm>
 #include "Common/Structures.h"
 
 class Server
@@ -23,9 +24,6 @@ class Server
 
         void dieWithError(const char *errorMessage);
 
-        uint32_t getIncomingMessageSize(sockaddr_in& clientAddress);
-        std::string getIncomingMessage(sockaddr_in& clientAddress);
-
         void sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::string additionalData); //Send a return code with optional additional data
         
         void parseClientMessage(Protocol::Message message, sockaddr_in& clientAddress);
@@ -33,7 +31,7 @@ class Server
 
         struct UserEntry { //The associated user information needed to register a new user
             std::string ipv4Addr;
-            std::vector<uint> communicationPorts;
+            std::vector<int> communicationPorts;
         };
         std::map<std::string, UserEntry> handleLookupTable; //This stores the key-value pairs of all the registered users by [@handle, {Registration information}]
 };
