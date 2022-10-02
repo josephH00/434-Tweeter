@@ -26,9 +26,10 @@ class Server
         uint32_t getIncomingMessageSize(sockaddr_in& clientAddress);
         std::string getIncomingMessage(sockaddr_in& clientAddress);
 
+        void sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::string additionalData); //Send a return code with optional additional data
+        
         void parseClientMessage(Protocol::Message message, sockaddr_in& clientAddress);
-
-        void sendReturnCode
+        
 
         struct UserEntry { //The associated user information needed to register a new user
             std::string ipv4Addr;

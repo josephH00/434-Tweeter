@@ -37,6 +37,8 @@ void Server::run()
         for (const auto &i : m.argList)
             std::cout << i << " ";
         std::cout << std::endl;
+
+        parseClientMessage(m, clientAddress); // Process the newly recievied information
     }
 }
 
@@ -85,19 +87,43 @@ std::string Server::getIncomingMessage(sockaddr_in &clientAddress)
     return strIncomingMessage;
 }
 
+void Server::sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::string additionalData = std::string())
+{
+
+    std::vector<std::string> args = {
+        Protocol::ReturnCodeToStrMap.at(code)                                       // Serializes the enum to a string
+    };                                                                              // Default nothing else is sent except for the code type
+    if (code == Protocol::ReturnCode::ARBITRARY && additionalData != std::string()) // Additional data is present
+        args.push_back(additionalData);                                             // Add it to the list
+
+    // Set up return code struct
+    Protocol::Message returnCode = {
+        .command = Protocol::TrackerClientCommands::ReturnCode,
+        .argList = args};
+
+    returnCode.sendMessage(
+        sock,
+        clientAddress);
+}
+
 void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAddress)
 {
     switch (message.command)
     {
-        case Protocol::TrackerClientCommands::Register: {
-            //Register arguments list: [@handle] [IPv4 Address] [Ports used by User]
-            //Returns: _SUCCESS_ if new unique handle, _FAILURE_ otherwise
+    case Protocol::TrackerClientCommands::Register:
+    {
+        // Register arguments list: [@handle] [IPv4 Address] [Ports used by User]
+        // Returns: _SUCCESS_ if new unique handle, _FAILURE_ otherwise
 
-            //if(message.argList.size() < 3)
+        if (message.argList.size() < 3)
+        {
+            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to register with is less than the required
+            std::cout << "Client";
         }
+    }
+    break;
+
+    default:
         break;
-
-        default:
-
     }
 }

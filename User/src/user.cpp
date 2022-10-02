@@ -48,7 +48,7 @@ int main( int argc, char *argv[] )
 
     Protocol::Message m = {
         .command = Protocol::TrackerClientCommands::Register,
-        .argList = {"@handle", "127.0.0.1", "0"},
+        .argList = {"@handle", "127.0.0.1"}, //Bad data
     };
     m.sendMessage(sock, echoServAddr);
     
