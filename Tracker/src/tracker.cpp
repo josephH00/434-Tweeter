@@ -5,7 +5,8 @@
 #include <string.h>     // for memset()
 #include <unistd.h>     // for close()
 
-#define ECHOMAX 255     // Longest string to echo
+#include "Common/Structures.h"
+
 
 void DieWithError( const char *errorMessage ) // External error handling function
 {
@@ -16,12 +17,11 @@ void DieWithError( const char *errorMessage ) // External error handling functio
 int main( int argc, char *argv[] )
 {
     int sock;                        // Socket
+
     struct sockaddr_in echoServAddr; // Local address of server
     struct sockaddr_in echoClntAddr; // Client address
-    unsigned int cliAddrLen;         // Length of incoming message
-    char echoBuffer[ ECHOMAX ];      // Buffer for echo string
+
     unsigned short echoServPort;     // Server port
-    int recvMsgSize;                 // Size of received message
 
     if( argc != 2 )         // Test for correct number of parameters
     {
@@ -47,21 +47,37 @@ int main( int argc, char *argv[] )
 
 	printf( "server: Port server is listening to is: %d\n", echoServPort );
 
-    for(;;) // Run forever
+    while(true)
     {
-        cliAddrLen = sizeof( echoClntAddr );
 
-        // Block until receive message from a client
-        if( ( recvMsgSize = recvfrom( sock, echoBuffer, ECHOMAX, 0, (struct sockaddr *) &echoClntAddr, &cliAddrLen )) < 0 )
-            DieWithError( "server: recvfrom() failed" );
+        uint clientAddressLen = sizeof(echoClntAddr);
 
-        echoBuffer[ recvMsgSize ] = '\0';
+        uint32_t incomingMessageSize = 0;
+        auto recievedMsgSize = recvfrom(
+            sock,
+            &incomingMessageSize,
+            Protocol::maxBufferSizeAnnouncementLength,
+            0,
+            (struct sockaddr *)&echoClntAddr,
+            &clientAddressLen);
+        incomingMessageSize = ntohl(incomingMessageSize); //Convert byte-order to original intended value
+        std::cout << incomingMessageSize << std::endl;
 
-        printf( "server: received string ``%s'' from client on IP address %s\n", echoBuffer, inet_ntoa( echoClntAddr.sin_addr ) );
+        char *cStrIncomingMessage = new char[incomingMessageSize]; //Create enough space for the message buffer
+        recievedMsgSize = recvfrom(
+            sock,
+            cStrIncomingMessage,
+            incomingMessageSize,
+            0,
+            (struct sockaddr *)&echoClntAddr,
+            &clientAddressLen);
+        cStrIncomingMessage[ incomingMessageSize ] = '\0';
 
-        // Send received datagram back to the client
-        if( sendto( sock, echoBuffer, strlen( echoBuffer ), 0, (struct sockaddr *) &echoClntAddr, sizeof( echoClntAddr ) ) != strlen( echoBuffer ) )
-            DieWithError( "server: sendto() sent a different number of bytes than expected" );
+        std::string strIncomingMessage = std::string(cStrIncomingMessage);
+        delete[] cStrIncomingMessage;
+
+        Protocol::Message m;
+        m.parseIncoming(strIncomingMessage);
+    
     }
-    // NOT REACHED */
 }
