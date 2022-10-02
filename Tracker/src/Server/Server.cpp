@@ -46,14 +46,14 @@ void Server::dieWithError(const char *errorMessage) // External error handling f
     std::exit(1);
 }
 
-void Server::sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::string additionalData = std::string())
+void Server::sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::vector<std::string> additionalData = std::vector<std::string>())
 {
 
     std::vector<std::string> args = {
         Protocol::ReturnCodeToStrMap.at(code)                                       // Serializes the enum to a string
     };                                                                              // Default nothing else is sent except for the code type
-    if (code == Protocol::ReturnCode::ARBITRARY && additionalData != std::string()) // Additional data is present
-        args.push_back(additionalData);                                             // Add it to the list
+    if (code == Protocol::ReturnCode::ARBITRARY && additionalData != std::vector<std::string> ()) // Additional data is present
+        args.insert(args.end(), additionalData.begin(), additionalData.end());                                             // Insert additional vector array after return code type
 
     // Set up return code struct
     Protocol::Message returnCode = {
@@ -86,7 +86,6 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
         std::vector<int> ports;
         for (auto i = message.argList.begin() + 2; i != message.argList.end(); i++)
         {
-            std::cout << *i << std::endl;
             ports.push_back(
                 atoi(i->c_str())); // Converts string port to int and adds it to the vector
         }
@@ -106,7 +105,24 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
         }
 
         handleLookupTable.insert(
-            {handle, {ipv4Addr, ports}});
+            {handle, {ipv4Addr, ports}}); // All else no errors, register client
+
+        sendReturnCode(clientAddress, Protocol::ReturnCode::SUCCESS);
+    }
+    break;
+
+    case Protocol::TrackerClientCommands::QueryHandles: {
+        //Querys handles registered with tracker
+        //Query Handles argument list: None
+        //Query Handles return list: [# of handles] [handle 1] [handle 2] [handle 3] [handle #]
+        //  Alt return list for 0 handles: [0]
+
+        std::vector<std::string> registeredHandles;
+        registeredHandles.push_back(std::to_string(
+            handleLookupTable.size() // First arg is how many handles are registered
+            ));
+
+        sendReturnCode(clientAddress, Protocol::ReturnCode::ARBITRARY, registeredHandles);
     }
     break;
 

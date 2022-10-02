@@ -11,27 +11,27 @@
 
 class Server
 {
-    public:
-        Server(int serverPort);
-        void run();
+public:
+    Server(int serverPort);
+    void run();
 
-    private:
-        int sock; // Socket
+private:
+    int sock; // Socket
 
-        sockaddr_in serverAddress; //Local address of server
-        
-        unsigned short serverPort; // Server port
+    sockaddr_in serverAddress; // Local address of server
 
-        void dieWithError(const char *errorMessage);
+    unsigned short serverPort; // Server port
 
-        void sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::string additionalData); //Send a return code with optional additional data
-        
-        void parseClientMessage(Protocol::Message message, sockaddr_in& clientAddress);
-        
+    void dieWithError(const char *errorMessage);
 
-        struct UserEntry { //The associated user information needed to register a new user
-            std::string ipv4Addr;
-            std::vector<int> communicationPorts;
-        };
-        std::map<std::string, UserEntry> handleLookupTable; //This stores the key-value pairs of all the registered users by [@handle, {Registration information}]
+    void sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::vector<std::string> additionalData); // Send a return code with optional additional data
+
+    void parseClientMessage(Protocol::Message message, sockaddr_in &clientAddress);
+
+    struct UserEntry
+    { // The associated user information needed to register a new user
+        std::string ipv4Addr;
+        std::vector<int> communicationPorts;
+    };
+    std::map<std::string, UserEntry> handleLookupTable; // This stores the key-value pairs of all the registered users by [@handle, {Registration information}]
 };
