@@ -17,21 +17,35 @@ namespace Protocol {
     enum class TrackerClientCommands
     {
         Register,
-        Query,
+        QueryHandles,
         Follow,
         Drop,
         Tweet,
         EndTweet,
-        Exit
+        Exit,
+        ReturnCode //This is used for sending back information to the client about a previous operation (eg registering for the service)
     };
     const std::map<TrackerClientCommands, std::string> TrackerToStrMap = {
         {TrackerClientCommands::Register, "register"},
-        {TrackerClientCommands::Query, "query"},
+        {TrackerClientCommands::QueryHandles, "query-handles"},
         {TrackerClientCommands::Follow, "follow"},
         {TrackerClientCommands::Drop, "drop"},
         {TrackerClientCommands::Tweet, "tweet"},
         {TrackerClientCommands::EndTweet, "end-tweet"},
         {TrackerClientCommands::Exit, "exit"},
+        {TrackerClientCommands::ReturnCode, "return-code"}
+    };
+
+    enum class ReturnCode
+    {
+        SUCCESS,
+        FAILURE,
+        ARBITRARY //If the data returned is neither a failure or success operation (eg. returning the number of handles a client has)
+    };
+    const std::map<ReturnCode, std::string> ReturnCodeToStrMap = {
+        {ReturnCode::SUCCESS, "SUCCESS"},
+        {ReturnCode::FAILURE, "FAILURE"},
+        {ReturnCode::ARBITRARY, "ARBITRARY"}
     };
 
     struct Message
@@ -54,7 +68,9 @@ namespace Protocol {
             while(ss.good()) {
                 std::string substr;
                 getline(ss, substr, ',');
-                argList.push_back(substr);
+
+                if (substr != "") //Avoid extra whitespace
+                    argList.push_back(substr);
             }
         }
 
@@ -70,7 +86,7 @@ namespace Protocol {
             std::cout << formattedData << std::endl;
             
 
-            uint32_t strLen = htonl(formattedData.length());
+            uint32_t strLen = htonl(formattedData.length()); //Send length of message beforehand
             if(sendto(
                 socketFD, 
                 &strLen, 
@@ -83,7 +99,7 @@ namespace Protocol {
                 exit(1);
             }
 
-            const char *cStrFormattedData = formattedData.c_str();
+            const char *cStrFormattedData = formattedData.c_str(); //Send 'formatted' message
             if(sendto(
                 socketFD,
                 cStrFormattedData,
