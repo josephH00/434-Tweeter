@@ -19,11 +19,11 @@ private:
     
     int sock;                        // Socket descriptor
 
-    struct sockaddr_in echoServAddr; // Echo server address
+    struct sockaddr_in serverAddress; // Echo server address
     struct sockaddr_in fromAddr;     // Source address of echo
 
     unsigned short serverPort;     // Echo server port
     const char *serverIP;                    // IP address of server
 
         void dieWithError(const char *errorMessage);
-}
+};
