@@ -134,8 +134,8 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
             handleLookupTable.size() // First arg is how many handles are registered
             ));
 
-        for(const auto& i : handleLookupTable)
-            registeredHandles.push_back(i.first); //Append all the handles registered in vector
+        for (const auto &i : handleLookupTable)
+            registeredHandles.push_back(i.first); // Append all the handles registered in vector
 
         sendReturnCode(clientAddress, Protocol::ReturnCode::ARBITRARY, registeredHandles);
     }
@@ -191,8 +191,9 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
     }
     break;
 
-    case Protocol::TrackerClientCommands::Drop: {
-        //Removes a handle from the follower list
+    case Protocol::TrackerClientCommands::Drop:
+    {
+        // Removes a handle from the follower list
 
         // Follow arg list: [original handle] [handle to drop]
         // Return: SUCCESS if possible, FAILURE if not registered
@@ -209,33 +210,37 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
 
         if (handleLookupTable.find(handle) == handleLookupTable.end()) // Handle was not registered (iterator reaches the end of the map)
         {
-            std::cout << "Client: @" << handle << " (" <<inet_ntoa(clientAddress.sin_addr) << ") " << "attempted to [drop] with a handle that was not already registered (" << handle << ")" << std::endl;
+            std::cout << "Client: @" << handle << " (" << inet_ntoa(clientAddress.sin_addr) << ") "
+                      << "attempted to [drop] with a handle that was not already registered (" << handle << ")" << std::endl;
             sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
         if (handleLookupTable.find(handleToDrop) == handleLookupTable.end()) // Handle to follow was not registered
         {
-            std::cout << "Client: @" << handle << " (" <<inet_ntoa(clientAddress.sin_addr) << ") " << "attempted to [drop] a handle that was not already registered (" << handleToDrop << ")" << std::endl;
+            std::cout << "Client: @" << handle << " (" << inet_ntoa(clientAddress.sin_addr) << ") "
+                      << "attempted to [drop] a handle that was not already registered (" << handleToDrop << ")" << std::endl;
             sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
         auto &handleFollowers = handleLookupTable[handle].followers; // Directly get the string vector
-        
-        if(std::find(handleFollowers.begin(), handleFollowers.end(), handleToDrop) == handleFollowers.end()) { //Check if handle to drop is actually being followed by the client
-            std::cout << "Client: @" << handle << " (" <<inet_ntoa(clientAddress.sin_addr) << ") " << "attempted to [drop] a handle that it was not already following (" << handleToDrop << ")" << std::endl;
+
+        if (std::find(handleFollowers.begin(), handleFollowers.end(), handleToDrop) == handleFollowers.end())
+        { // Check if handle to drop is actually being followed by the client
+            std::cout << "Client: @" << handle << " (" << inet_ntoa(clientAddress.sin_addr) << ") "
+                      << "attempted to [drop] a handle that it was not already following (" << handleToDrop << ")" << std::endl;
             sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
-        //Remove element matching the follower to be dropped's handle from the table, this will stay in alphabetically order when it's removed since no other elements will be modified
+        // Remove element matching the follower to be dropped's handle from the table, this will stay in alphabetically order when it's removed since no other elements will be modified
         handleFollowers.erase(
             std::remove(
-                handleFollowers.begin(), 
-                handleFollowers.end(), 
+                handleFollowers.begin(),
+                handleFollowers.end(),
                 handleToDrop),
-             handleFollowers.end());
+            handleFollowers.end());
 
         // Inform console
         std::cout << "Sucessfully dropped follower (@" << handleToDrop << ") of @" << handle << std::endl;
@@ -250,8 +255,67 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
     }
     break;
 
-    case Protocol::TrackerClientCommands::Exit: {
+    case Protocol::TrackerClientCommands::Exit:
+    {
+        // Removes a client's handle from the registry
+        // Args: [handle to be removed]
 
+        if (message.argList.size() < 1)
+        {
+            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " sent malformed [exit] request" << std::endl;
+            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
+            break;
+        }
+
+        std::string handleToDrop = message.argList.at(0);
+
+        if (handleLookupTable.find(handleToDrop) == handleLookupTable.end()) // Handle was not registered (iterator reaches the end of the map)
+        {
+            std::cout << "Client: @" << handleToDrop << " (" << inet_ntoa(clientAddress.sin_addr) << ") "
+                      << "attempted to [exit] with a handle that was not already registered (" << handleToDrop << ")" << std::endl;
+            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            break;
+        }
+
+        /*
+         * TODO: Check if a tweet is in progress & delay before removing
+         */
+
+        // Iterates through all of the registered handles and removes the handle-to-be-removed from it's follower list
+        for (auto &registeredHandle : handleLookupTable)
+        {
+            auto &handleFollowers = (registeredHandle.second).followers; // Directly get the string vector from the K-V pair
+
+            if (std::find(handleFollowers.begin(), handleFollowers.end(), handleToDrop) == handleFollowers.end()) // Skip if the currently iterated handle doesn't contain the to-be-removed-handle. Techincally when passing in a value that doesn't exist to the remove-erase idiom it produces undefined behavior for the vector<T>::erase, during testing it just silently failed but just to make sure
+                continue;
+
+            // Remove element matching the follower to be dropped's handle from the table
+            handleFollowers.erase(
+                std::remove(
+                    handleFollowers.begin(),
+                    handleFollowers.end(),
+                    handleToDrop),
+                handleFollowers.end());
+        }
+
+        /*
+         * TODO: Remove state of logical ring of exiting handle
+         *      Should recieve a 'exit-complete' command from the client
+         */
+
+        handleLookupTable.erase( // Remove exiting-handle from the list of registered clients
+            handleLookupTable.find(handleToDrop));
+
+        // Inform console
+        std::cout << "Sucessfully processed handle (@" << handleToDrop << ") exit" << std::endl;
+        std::cout << "Current registered handles: ";
+        for (const auto &i : handleLookupTable)
+        {
+            std::cout << i.first << ' ';
+        }
+        std::cout << std::endl;
+
+        sendReturnCode(clientAddress, Protocol::ReturnCode::SUCCESS);
     }
     break;
 
