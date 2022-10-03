@@ -308,7 +308,7 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
 
         // Inform console
         std::cout << "Sucessfully processed handle (@" << handleToDrop << ") exit" << std::endl;
-        std::cout << "Current registered handles: ";
+        std::cout << "Remaining registered handles: ";
         for (const auto &i : handleLookupTable)
         {
             std::cout << i.first << ' ';
