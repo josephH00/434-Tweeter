@@ -27,16 +27,49 @@ void User::dieWithError(const char *errorMessage) // External error handling fun
 
 void User::run()
 {
-    while(true) {
-    std::cout << "Command> ";
+    std::cout << "Commands arguments are delimited with a SPACE (' ')" << std::endl;
+    while (true)
+    {
+        std::cout << "Command> ";
 
-    std::string userInput;
-    std::getline(std ::cin, userInput);
+        std::string userInput;
+        std::getline(std ::cin, userInput); //Get user input from STDIN
 
-    Protocol::Message m;
-    m.parseIncoming(userInput, ' ');
-    m.sendMessage(sock, serverAddress);
+        Protocol::Message m;
+        if (!m.parseIncoming(userInput, ' ')) //If there is an error parsing the user's input, let them know
+        {
+            std::cout << "<<Malformed command, try again>>" << std::endl;
+            continue; //Skip loop
+        }
+        
+        //Let user know what's being sent
+            std::cout << "Sending command [" << Protocol::TrackerToStrMap.at(m.command) << "] to server [" << serverIP << "] with arguments: ";
+            for (const auto &i : m.argList)
+                std::cout << i << " ";
+            std::cout << std::endl;
 
-    
+            m.sendMessage(sock, serverAddress);
+            
+        //Block for server response
+        Protocol::Message response;
+        response.getIncomingMessage(sock, serverAddress);
+        if (response.command != Protocol::TrackerClientCommands::ReturnCode)
+        {
+            std::cout << "Server sent command [" << Protocol::TrackerToStrMap.at(response.command) << "] instead of expected response code" << std::endl;
+            continue; //Go back user input
+        }
+
+        std::string strResponseCode = response.argList.at(0); //The response code eg SUCCESS, FAILURE is in the first arg
+
+        std::string formattedResponse;
+        if(strResponseCode == Protocol::ReturnCodeToStrMap.at(Protocol::ReturnCode::ARBITRARY)) //If the server sends back additional data (instead of a success or failure), just display that
+            for (auto i = response.argList.begin() + 1; i != response.argList.end(); i++) {
+                formattedResponse.append(*i);
+                formattedResponse.append(" ");
+            }
+        else
+            formattedResponse = strResponseCode;
+
+        std::cout << "-> Got response from server: " << formattedResponse << std::endl;
     }
 }
