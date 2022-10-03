@@ -37,6 +37,9 @@ void Server::run()
         std::cout << std::endl;
 
         parseClientMessage(m, clientAddress); // Process the newly recievied information
+
+        std::cout << std::endl
+                  << std::endl; // Spread out messages on the console
     }
 }
 
@@ -48,10 +51,10 @@ void Server::dieWithError(const char *errorMessage) // External error handling f
 
 void Server::sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::vector<std::string> additionalData = std::vector<std::string>())
 {
-
     std::vector<std::string> args = {
-        Protocol::ReturnCodeToStrMap.at(code)                                                    // Serializes the enum to a string
-    };                                                                                           // Default nothing else is sent except for the code type
+        Protocol::ReturnCodeToStrMap.at(code) // Serializes the enum to a string
+    };
+    // Default nothing else is sent except for the code type
     if (code == Protocol::ReturnCode::ARBITRARY && additionalData != std::vector<std::string>()) // Additional data is present
         args.insert(args.end(), additionalData.begin(), additionalData.end());                   // Insert additional vector array after return code type
 
@@ -59,6 +62,12 @@ void Server::sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode cod
     Protocol::Message returnCode = {
         .command = Protocol::TrackerClientCommands::ReturnCode,
         .argList = args};
+
+    // Inform console
+    std::cout << "-> Sending return code: ";
+    for (const auto &i : args)
+        std::cout << i << " ";
+    std::cout << std::endl;
 
     returnCode.sendMessage(
         sock,
@@ -73,6 +82,7 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
     {
         // Register arguments list: [@handle] [IPv4 Address] [Ports used by User]
         // Returns: _SUCCESS_ if new unique handle, _FAILURE_ otherwise
+
         if (message.argList.size() < 3)
         {
             std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " sent malformed [register] request" << std::endl;
@@ -104,8 +114,9 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
             break;
         }
 
+        // If a client with the same ipv4 address arg registers it faults, todo: Fix
         handleLookupTable.insert(
-            {handle, {ipv4Addr, ports}}); // All else no errors, register client
+            {handle, {ipv4Addr, ports, {}}}); // All else no errors, register client
 
         sendReturnCode(clientAddress, Protocol::ReturnCode::SUCCESS);
     }
@@ -142,36 +153,44 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
         std::string handle = message.argList.at(0);
         std::string handleToFollow = message.argList.at(1);
 
-        if (handleLookupTable.find(handle) != handleLookupTable.end())
+        if (handleLookupTable.find(handle) == handleLookupTable.end()) // Handle was not registered (iterator reaches the end of the map)
         {
-            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " attempted to [follow] with a handle that was not already registered (" << message.argList.at(0) << ")" << std::endl;
+            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " attempted to [follow] with a handle that was not already registered (" << handle << ")" << std::endl;
             sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
-        if (handleLookupTable.find(handleToFollow) != handleLookupTable.end())
+        if (handleLookupTable.find(handleToFollow) == handleLookupTable.end()) // Handle to follow was not registered
         {
-            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " attempted to [follow] a handle that was not already registered (" << message.argList.at(0) << ")" << std::endl;
+            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " attempted to [follow] a handle that was not already registered (" << handleToFollow << ")" << std::endl;
             sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
-        auto &handleUserInformation = handleLookupTable[handle];
 
+        auto &handleUserInformation = handleLookupTable[handle]; // Directly get the string vector
         auto it = std::upper_bound(std::begin(handleUserInformation.followers), std::end(handleUserInformation.followers), handleToFollow,
                                    [](auto const &a, auto const &b)
                                    {
-                                       return a.compare(b) < 0; //Find the position where inserting would be in alphabetical order
+                                       return a.compare(b) < 0; // Find the position where inserting would be in alphabetical order
                                    });
-        handleUserInformation.followers.insert(it, handleToFollow);
+        handleUserInformation.followers.insert(it, handleToFollow); // Insert into the sorted vector
 
-        std::cout << "followers\n";
+        // Inform console
+        std::cout << "Sucessfully added follower (@" << handleToFollow << ") to @" << handle << std::endl;
+        std::cout << "Current followers of @" << handle << ": ";
         for (const auto i : handleLookupTable.at(handle).followers)
         {
-            std::cout << i << std::endl;
+            std::cout << i << ' ';
         }
+        std::cout << std::endl;
+
+        sendReturnCode(clientAddress, Protocol::ReturnCode::SUCCESS);
     }
+    break;
 
     default:
+        std::cout << "Command not implimented!" << std::endl;
+        
         break;
     }
 }
