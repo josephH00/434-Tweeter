@@ -70,6 +70,7 @@ void User::run()
         else
             formattedResponse = strResponseCode;
 
-        std::cout << "-> Got response from server: " << formattedResponse << std::endl;
+        std::cout << "-> Got response from server: " << formattedResponse << std::endl
+                  << std::endl;
     }
 }
