@@ -134,6 +134,9 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
             handleLookupTable.size() // First arg is how many handles are registered
             ));
 
+        for(const auto& i : handleLookupTable)
+            registeredHandles.push_back(i.first); //Append all the handles registered in vector
+
         sendReturnCode(clientAddress, Protocol::ReturnCode::ARBITRARY, registeredHandles);
     }
     break;
