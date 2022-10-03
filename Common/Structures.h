@@ -124,7 +124,6 @@ namespace Protocol
                 formattedData.append(",");
             }
             formattedData[formattedData.length()] = '\0';
-            std::cout << formattedData << std::endl;
 
             uint32_t strLen = htonl(formattedData.length()); // Send length of message beforehand
             if (sendto(
