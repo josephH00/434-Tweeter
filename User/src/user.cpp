@@ -28,24 +28,5 @@ int main( int argc, char *argv[] )
         atoi(argv[2]) // Second arg: Server port
     );
 
-    std::cout << "sending registration" << std::endl;
-    Protocol::Message reg = {
-        .command = Protocol::TrackerClientCommands::Register,
-        .argList = {"handle2", "ip", "1024", "69"}};
-    reg.sendMessage(sock, echoServAddr);
-    Protocol::Message rr;
-    rr.getIncomingMessage(sock, echoServAddr);
-    std::cout << rr.argList.at(0);
-
-    
-    std::cout << "sending follow" << std::endl;
-    Protocol::Message m = {
-        .command = Protocol::TrackerClientCommands::Follow,
-        .argList = {"follow", "handle2", "handle"}};
-    m.sendMessage(sock, echoServAddr);
-
-
-
-    close( sock );
-    exit( 0 );
+    user.run();
 }
