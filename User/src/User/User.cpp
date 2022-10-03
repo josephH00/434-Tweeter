@@ -11,10 +11,10 @@ User::User(const char *serverIPAddress, int serverPort)
         dieWithError("client: socket() failed");
 
     // Construct the server address structure
-    memset(&echoServAddr, 0, sizeof(echoServAddr));     // Zero out structure
-    echoServAddr.sin_family = AF_INET;                  // Use internet addr family
-    echoServAddr.sin_addr.s_addr = inet_addr(serverIP); // Set server's IP address
-    echoServAddr.sin_port = htons(serverPort);          // Set server's port
+    memset(&serverAddress, 0, sizeof(serverAddress));     // Zero out structure
+    serverAddress.sin_family = AF_INET;                  // Use internet addr family
+    serverAddress.sin_addr.s_addr = inet_addr(serverIP); // Set server's IP address
+    serverAddress.sin_port = htons(serverPort);          // Set server's port
 
     std::cout << "Client is running with server on: " << serverIP << ":" << serverPort << std::endl;
 }
@@ -27,6 +27,7 @@ void User::dieWithError(const char *errorMessage) // External error handling fun
 
 void User::run()
 {
+    while(true) {
     std::cout << "Command> ";
 
     std::string userInput;
@@ -34,5 +35,8 @@ void User::run()
 
     Protocol::Message m;
     m.parseIncoming(userInput, ' ');
+    m.sendMessage(sock, serverAddress);
+
     
+    }
 }
