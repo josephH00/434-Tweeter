@@ -24,7 +24,8 @@ namespace Protocol
         Tweet,
         EndTweet,
         Exit,
-        ReturnCode // This is used for sending back information to the client about a previous operation (eg registering for the service)
+        ReturnCode, // This is used for sending back information to the client about a previous operation (eg registering for the service)
+        __NotSet //Internal value used for converting back strings to enum values
     };
     const std::map<TrackerClientCommands, std::string> TrackerToStrMap = {
         {TrackerClientCommands::Register, "register"},
@@ -49,7 +50,7 @@ namespace Protocol
 
     struct Message
     {
-        TrackerClientCommands command;
+        TrackerClientCommands command = TrackerClientCommands::__NotSet;
         std::vector<std::string> argList;
 
         void getIncomingMessage(int socketFD, sockaddr_in &clientAddress)
@@ -68,9 +69,6 @@ namespace Protocol
 
             auto msgSize = ntohl(incomingMessageSize); // Convert byte-order to original intended value
                                                        // The message could have a variable length of arguements we get how long it should be before it arrives
-            // auto msgSize = getIncomingMessageSize(clientAddress);
-
-            // uint clientAddressLen = sizeof(clientAddress);
 
             /* Get the just sent message */
             char *cStrIncomingMessage = new char[msgSize]; // Create enough space for the message buffer
@@ -91,16 +89,20 @@ namespace Protocol
             parseIncoming(strIncomingMessage, ',');
         }
 
-        void parseIncoming(std::string inStr, char delim)
+        bool parseIncoming(std::string inStr, char delim)
         {
             std::stringstream ss(inStr);
 
             std::string msgCommand;
             getline(ss, msgCommand, delim);
 
+            command = TrackerClientCommands::__NotSet; //Set command value to prevent accidental use of non overwriten data
             for (const auto &[key, value] : TrackerToStrMap) // Reverse search the message's string to a tracker command enum value
                 if (msgCommand == value)
                     command = key;
+            
+            if (command == TrackerClientCommands::__NotSet)
+                return false; //A command was not resolved from the message string
 
             // Parse the command's arguments, spliting on commas
             while (ss.good())
@@ -111,6 +113,8 @@ namespace Protocol
                 if (substr != "") // Avoid extra whitespace
                     argList.push_back(substr);
             }
+
+            return true;
         }
 
         void sendMessage(int socketFD, sockaddr_in &address)
