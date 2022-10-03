@@ -8,6 +8,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "base64/base64.h"
+
 typedef unsigned int uint;
 
 namespace Protocol
@@ -86,10 +88,10 @@ namespace Protocol
             std::string strIncomingMessage = std::string(cStrIncomingMessage); // Can't delete before it's used
             delete[] cStrIncomingMessage;
 
-            parseIncoming(strIncomingMessage, ',');
+            parseIncoming(strIncomingMessage, ',', true);
         }
 
-        bool parseIncoming(std::string inStr, char delim)
+        bool parseIncoming(std::string inStr, char delim, bool isInputBase64Encoded = false)
         {
 
             if(command != TrackerClientCommands::__NotSet)
@@ -113,6 +115,9 @@ namespace Protocol
                 std::string substr;
                 getline(ss, substr, delim);
 
+                if(isInputBase64Encoded)
+                    substr = base64_decode(substr); //Decode b64 argument
+
                 if (substr != "") // Avoid extra whitespace
                     argList.push_back(substr);
             }
@@ -127,7 +132,9 @@ namespace Protocol
             std::string formattedData = TrackerToStrMap.at(command) + ",";
             for (const auto &i : argList)
             {
-                formattedData.append(i);
+                formattedData.append(
+                    base64_encode(i) //Encode argument in b64 to prevent escaping
+                    );
                 formattedData.append(",");
             }
             formattedData[formattedData.length()] = '\0';
