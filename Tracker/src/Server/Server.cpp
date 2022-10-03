@@ -188,9 +188,72 @@ void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAd
     }
     break;
 
+    case Protocol::TrackerClientCommands::Drop: {
+        //Removes a handle from the follower list
+
+        // Follow arg list: [original handle] [handle to drop]
+        // Return: SUCCESS if possible, FAILURE if not registered
+
+        if (message.argList.size() < 2)
+        {
+            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " sent malformed [drop] request" << std::endl;
+            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
+            break;
+        }
+
+        std::string handle = message.argList.at(0);
+        std::string handleToDrop = message.argList.at(1);
+
+        if (handleLookupTable.find(handle) == handleLookupTable.end()) // Handle was not registered (iterator reaches the end of the map)
+        {
+            std::cout << "Client: @" << handle << " (" <<inet_ntoa(clientAddress.sin_addr) << ") " << "attempted to [drop] with a handle that was not already registered (" << handle << ")" << std::endl;
+            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            break;
+        }
+
+        if (handleLookupTable.find(handleToDrop) == handleLookupTable.end()) // Handle to follow was not registered
+        {
+            std::cout << "Client: @" << handle << " (" <<inet_ntoa(clientAddress.sin_addr) << ") " << "attempted to [drop] a handle that was not already registered (" << handleToDrop << ")" << std::endl;
+            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            break;
+        }
+
+        auto &handleFollowers = handleLookupTable[handle].followers; // Directly get the string vector
+        
+        if(std::find(handleFollowers.begin(), handleFollowers.end(), handleToDrop) == handleFollowers.end()) { //Check if handle to drop is actually being followed by the client
+            std::cout << "Client: @" << handle << " (" <<inet_ntoa(clientAddress.sin_addr) << ") " << "attempted to [drop] a handle that it was not already following (" << handleToDrop << ")" << std::endl;
+            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            break;
+        }
+
+        //Remove element matching the follower to be dropped's handle from the table, this will stay in alphabetically order when it's removed since no other elements will be modified
+        handleFollowers.erase(
+            std::remove(
+                handleFollowers.begin(), 
+                handleFollowers.end(), 
+                handleToDrop),
+             handleFollowers.end());
+
+        // Inform console
+        std::cout << "Sucessfully dropped follower (@" << handleToDrop << ") of @" << handle << std::endl;
+        std::cout << "Current followers of @" << handle << ": ";
+        for (const auto i : handleLookupTable.at(handle).followers)
+        {
+            std::cout << i << ' ';
+        }
+        std::cout << std::endl;
+
+        sendReturnCode(clientAddress, Protocol::ReturnCode::SUCCESS);
+    }
+    break;
+
+    case Protocol::TrackerClientCommands::Exit: {
+
+    }
+    break;
+
     default:
         std::cout << "Command not implimented!" << std::endl;
-        
         break;
     }
 }
