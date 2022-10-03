@@ -8,6 +8,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "base64/base64.h"
+
 typedef unsigned int uint;
 
 namespace Protocol
@@ -25,7 +27,7 @@ namespace Protocol
         EndTweet,
         Exit,
         ReturnCode, // This is used for sending back information to the client about a previous operation (eg registering for the service)
-        __NotSet //Internal value used for converting back strings to enum values
+        __NotSet    // Internal value used for converting back strings to enum values
     };
     const std::map<TrackerClientCommands, std::string> TrackerToStrMap = {
         {TrackerClientCommands::Register, "register"},
@@ -86,14 +88,14 @@ namespace Protocol
             std::string strIncomingMessage = std::string(cStrIncomingMessage); // Can't delete before it's used
             delete[] cStrIncomingMessage;
 
-            parseIncoming(strIncomingMessage, ',');
+            parseIncoming(strIncomingMessage, ',', true);
         }
 
-        bool parseIncoming(std::string inStr, char delim)
+        bool parseIncoming(std::string inStr, char delim, bool isInputBase64Encoded = false)
         {
 
-            if(command != TrackerClientCommands::__NotSet)
-                throw std::runtime_error("Attempted to overwrite an already populated message!"); //Set command value to prevent accidental use of non overwriten data
+            if (command != TrackerClientCommands::__NotSet)
+                throw std::runtime_error("Attempted to overwrite an already populated message!"); // Set command value to prevent accidental use of non overwriten data
 
             std::stringstream ss(inStr);
 
@@ -103,15 +105,18 @@ namespace Protocol
             for (const auto &[key, value] : TrackerToStrMap) // Reverse search the message's string to a tracker command enum value
                 if (msgCommand == value)
                     command = key;
-            
+
             if (command == TrackerClientCommands::__NotSet)
-                return false; //A command was not resolved from the message string
+                return false; // A command was not resolved from the message string
 
             // Parse the command's arguments, spliting on commas
             while (ss.good())
             {
                 std::string substr;
                 getline(ss, substr, delim);
+
+                if (isInputBase64Encoded)
+                    substr = base64_decode(substr); // Decode b64 argument
 
                 if (substr != "") // Avoid extra whitespace
                     argList.push_back(substr);
@@ -127,7 +132,9 @@ namespace Protocol
             std::string formattedData = TrackerToStrMap.at(command) + ",";
             for (const auto &i : argList)
             {
-                formattedData.append(i);
+                formattedData.append(
+                    base64_encode(i) // Encode argument in b64 to prevent escaping
+                );
                 formattedData.append(",");
             }
             formattedData[formattedData.length()] = '\0';
