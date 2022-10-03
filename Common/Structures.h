@@ -91,12 +91,15 @@ namespace Protocol
 
         bool parseIncoming(std::string inStr, char delim)
         {
+
+            if(command != TrackerClientCommands::__NotSet)
+                throw std::runtime_error("Attempted to overwrite an already populated message!"); //Set command value to prevent accidental use of non overwriten data
+
             std::stringstream ss(inStr);
 
             std::string msgCommand;
             getline(ss, msgCommand, delim);
 
-            command = TrackerClientCommands::__NotSet; //Set command value to prevent accidental use of non overwriten data
             for (const auto &[key, value] : TrackerToStrMap) // Reverse search the message's string to a tracker command enum value
                 if (msgCommand == value)
                     command = key;
