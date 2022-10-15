@@ -8,19 +8,19 @@
 #include "Common/Structures.h"
 #include "User/User.h"
 
-void DieWithError( const char *errorMessage ) // External error handling function
+void DieWithError(const char *errorMessage) // External error handling function
 {
-    perror( errorMessage );
+    perror(errorMessage);
     exit(1);
 }
 
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
 
-    if (argc < 3)    // Test for correct number of arguments
+    if (argc < 3) // Test for correct number of arguments
     {
-        fprintf( stderr, "Usage: %s <Server IP address> <Echo Port>\n", argv[0] );
-        exit( 1 );
+        fprintf(stderr, "Usage: %s <Server IP address> <Echo Port>\n", argv[0]);
+        exit(1);
     }
 
     User user(

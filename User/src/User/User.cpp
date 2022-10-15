@@ -11,7 +11,7 @@ User::User(const char *serverIPAddress, int serverPort)
         dieWithError("client: socket() failed");
 
     // Construct the server address structure
-    memset(&serverAddress, 0, sizeof(serverAddress));     // Zero out structure
+    memset(&serverAddress, 0, sizeof(serverAddress));    // Zero out structure
     serverAddress.sin_family = AF_INET;                  // Use internet addr family
     serverAddress.sin_addr.s_addr = inet_addr(serverIP); // Set server's IP address
     serverAddress.sin_port = htons(serverPort);          // Set server's port
@@ -33,37 +33,38 @@ void User::run()
         std::cout << "Command> ";
 
         std::string userInput;
-        std::getline(std ::cin, userInput); //Get user input from STDIN
+        std::getline(std ::cin, userInput); // Get user input from STDIN
 
         Protocol::Message m;
-        if (!m.parseIncoming(userInput, ' ')) //If there is an error parsing the user's input, let them know
+        if (!m.parseIncoming(userInput, ' ')) // If there is an error parsing the user's input, let them know
         {
             std::cout << "<<Malformed command, try again>>" << std::endl;
-            continue; //Skip loop
+            continue; // Skip loop
         }
-        
-        //Let user know what's being sent
-            std::cout << "Sending command [" << Protocol::TrackerToStrMap.at(m.command) << "] to server [" << serverIP << "] with arguments: ";
-            for (const auto &i : m.argList)
-                std::cout << i << " ";
-            std::cout << std::endl;
 
-            m.sendMessage(sock, serverAddress);
-            
-        //Block for server response
+        // Let user know what's being sent
+        std::cout << "Sending command [" << Protocol::TrackerToStrMap.at(m.command) << "] to server [" << serverIP << "] with arguments: ";
+        for (const auto &i : m.argList)
+            std::cout << i << " ";
+        std::cout << std::endl;
+
+        m.sendMessage(sock, serverAddress);
+
+        // Block for server response
         Protocol::Message response;
         response.getIncomingMessage(sock, serverAddress);
         if (response.command != Protocol::TrackerClientCommands::ReturnCode)
         {
             std::cout << "Server sent command [" << Protocol::TrackerToStrMap.at(response.command) << "] instead of expected response code" << std::endl;
-            continue; //Go back user input
+            continue; // Go back user input
         }
 
-        std::string strResponseCode = response.argList.at(0); //The response code eg SUCCESS, FAILURE is in the first arg
+        std::string strResponseCode = response.argList.at(0); // The response code eg SUCCESS, FAILURE is in the first arg
 
         std::string formattedResponse;
-        if(strResponseCode == Protocol::ReturnCodeToStrMap.at(Protocol::ReturnCode::ARBITRARY)) //If the server sends back additional data (instead of a success or failure), just display that
-            for (auto i = response.argList.begin() + 1; i != response.argList.end(); i++) {
+        if (strResponseCode == Protocol::ReturnCodeToStrMap.at(Protocol::ReturnCode::ARBITRARY)) // If the server sends back additional data (instead of a success or failure), just display that
+            for (auto i = response.argList.begin() + 1; i != response.argList.end(); i++)
+            {
                 formattedResponse.append(*i);
                 formattedResponse.append(" ");
             }
