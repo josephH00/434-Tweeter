@@ -1,9 +1,9 @@
 #pragma once
-#include <stdio.h>      // for printf() and fprintf()
-#include <sys/socket.h> // for socket() and bind()
-#include <arpa/inet.h>  // for sockaddr_in and inet_ntoa()
-#include <string.h>     // for memset()
-#include <unistd.h>     // for close()
+#include <stdio.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <string.h>
+#include <unistd.h>
 #include <cstdlib>
 
 #include <algorithm>
