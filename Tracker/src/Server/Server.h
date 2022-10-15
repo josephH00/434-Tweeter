@@ -5,8 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <cstdlib>
-
 #include <algorithm>
+
 #include "Common/Structures.h"
 
 class Server
