@@ -9,34 +9,39 @@
 
 #include "Common/Protocol.h"
 
-/**
- * @brief The response (message + additional data) when the server receives data from a client
- * 
- */
-struct SocketServerResponse {
-    sockaddr_in clientIPAddress;
-    Protocol::Message msg;
-};
-
-/**
- * @brief This wraps the instantiation and the required C functions needed to operate a socket based server
- * @details This was created to reduce unnecessary boilerplate across both the client and tracker processes
- */
-class SocketServer
+namespace SocketServer
 {
-public:
-    SocketServer(int serverPort);
-    ~SocketServer() { close(socket); }
+    /**
+     * @brief The response (message + additional data) when the server receives data from a client
+     *
+     */
+    struct Response
+    {
+        sockaddr_in clientAddress;
+        Protocol::Message msg;
+    };
 
-    SocketServerResponse getIncomingBlockingMessage();
+    /**
+     * @brief This wraps the instantiation and the required C functions needed to operate a socket based server
+     * @details This was created to reduce unnecessary boilerplate across both the client and tracker processes
+     */
+    class Server
+    {
+    public:
+        Server(int serverPort);
+        ~Server() { close(socket); }
 
-    void sendMessage(Protocol::Message msg);
-    void sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::vector<std::string> additionalData); // Send a return code with optional additional data
+        Response getIncomingBlockingMessage();
 
-private:
-    int socket;
-    sockaddr_in serverAddress;
-    unsigned short serverPort;
+        void sendMessage(Protocol::Message msg);
+        void sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::vector<std::string> additionalData = std::vector<std::string>()); // Send a return code with optional additional data
 
-    void dieWithError(const char *errorMessage);
+    private:
+        int socket;
+        sockaddr_in serverAddress;
+        unsigned short serverPort;
+
+        void dieWithError(const char *errorMessage);
+    };
+
 };

@@ -6,31 +6,24 @@
 #include <unistd.h>
 #include <cstdlib>
 #include <algorithm>
+#include <memory>
 
 #include "Common/Protocol.h"
+#include "Common/SocketServer/SocketServer.h"
 
 class Tracker
 {
 public:
     Tracker(int serverPort);
-    ~Tracker() { close(sock); }
     void run();
 
 private:
-    int sock; // Socket
+    std::unique_ptr<SocketServer::Server> socketServer;
 
-    sockaddr_in serverAddress; // Local address of server
+    void parseClientMessage(SocketServer::Response);
 
-    unsigned short serverPort; // Server port
-
-    void dieWithError(const char *errorMessage);
-
-    void sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::vector<std::string> additionalData); // Send a return code with optional additional data
-
-    void parseClientMessage(Protocol::Message message, sockaddr_in &clientAddress);
-
-    struct UserEntry
-    { // The associated user information needed to register a new user
+    struct UserEntry // The associated user information needed to register a new user
+    {
         std::string ipv4Addr;
         std::vector<int> communicationPorts;
         std::vector<std::string> followers; // Sorted list of who follows what handle

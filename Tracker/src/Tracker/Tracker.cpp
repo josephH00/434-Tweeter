@@ -2,99 +2,48 @@
 
 Tracker::Tracker(int serverPort)
 {
-
-    this->serverPort = serverPort;
-
-    // Create socket for sending/receiving datagrams
-    if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
-        dieWithError("server: socket() failed");
-
-    // Construct local address structure
-    memset(&serverAddress, 0, sizeof(serverAddress));  // Zero out structure
-    serverAddress.sin_family = AF_INET;                // Internet address family
-    serverAddress.sin_addr.s_addr = htonl(INADDR_ANY); // Any incoming interface
-    serverAddress.sin_port = htons(serverPort);        // Local port
-
-    // Bind to the local address
-    if (bind(sock, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
-        dieWithError("server: bind() failed");
-
-    std::cout << "Server is listening on port " << serverPort << std::endl;
+    socketServer = std::make_unique<SocketServer::Server>(serverPort);
 }
 
 void Tracker::run()
 {
     while (true)
     {
-        sockaddr_in clientAddress;
+        auto r = socketServer->getIncomingBlockingMessage();
 
-        Protocol::Message m;
-        m.getIncomingMessage(sock, clientAddress);
-
-        std::cout << "Recieved command [" << Protocol::TrackerToStrMap.at(m.command) << "] from client @" << inet_ntoa(clientAddress.sin_addr) << ":\n\tArgs: ";
-        for (const auto &i : m.argList)
+        std::cout << "Received command [" << Protocol::TrackerToStrMap.at(r.msg.command) << "] from client @" << inet_ntoa(r.clientAddress.sin_addr) << ":\n\tArgs: ";
+        for (const auto &i : r.msg.argList)
             std::cout << i << " ";
         std::cout << std::endl;
 
-        parseClientMessage(m, clientAddress); // Process the newly recievied information
+        parseClientMessage(r); // Process the newly received information
 
         std::cout << std::endl
                   << std::endl; // Spread out messages on the console
     }
 }
 
-void Tracker::dieWithError(const char *errorMessage) // External error handling function
+void Tracker::parseClientMessage(SocketServer::Response response)
 {
-    perror(errorMessage);
-    std::exit(1);
-}
-
-void Tracker::sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::vector<std::string> additionalData = std::vector<std::string>())
-{
-    std::vector<std::string> args = {
-        Protocol::ReturnCodeToStrMap.at(code) // Serializes the enum to a string
-    };
-    // Default nothing else is sent except for the code type
-    if (code == Protocol::ReturnCode::ARBITRARY && additionalData != std::vector<std::string>()) // Additional data is present
-        args.insert(args.end(), additionalData.begin(), additionalData.end());                   // Insert additional vector array after return code type
-
-    // Set up return code struct
-    Protocol::Message returnCode = {
-        .command = Protocol::TrackerClientCommands::ReturnCode,
-        .argList = args};
-
-    // Inform console
-    std::cout << "-> Sending return code: ";
-    for (const auto &i : args)
-        std::cout << i << " ";
-    std::cout << std::endl;
-
-    returnCode.sendMessage(
-        sock,
-        clientAddress);
-}
-
-void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientAddress)
-{
-    switch (message.command)
+    switch (response.msg.command)
     {
     case Protocol::TrackerClientCommands::Register:
     {
         // Register arguments list: [@handle] [IPv4 Address] [Ports used by User]
         // Returns: _SUCCESS_ if new unique handle, _FAILURE_ otherwise
 
-        if (message.argList.size() < 3)
+        if (response.msg.argList.size() < 3)
         {
-            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " sent malformed [register] request" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to register with is less than the required
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " sent malformed [register] request" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to register with is less than the required
             break;
         }
 
-        std::string handle = message.argList.at(0);
-        std::string ipv4Addr = message.argList.at(1);
+        std::string handle = response.msg.argList.at(0);
+        std::string ipv4Addr = response.msg.argList.at(1);
 
         std::vector<int> ports;
-        for (auto i = message.argList.begin() + 2; i != message.argList.end(); i++)
+        for (auto i = response.msg.argList.begin() + 2; i != response.msg.argList.end(); i++)
         {
             ports.push_back(
                 atoi(i->c_str())); // Converts string port to int and adds it to the vector
@@ -102,15 +51,15 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
 
         if (handle.length() > 15)
         {
-            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " attempted to [register] a handler greater than 15 characters (" << message.argList.at(0) << ")" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " attempted to [register] a handler greater than 15 characters (" << response.msg.argList.at(0) << ")" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
         if (handleLookupTable.find(handle) != handleLookupTable.end())
         { // A duplicate handle was already registered
-            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " attempted to [register] a handler that already exists (" << message.argList.at(0) << ")" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " attempted to [register] a handler that already exists (" << response.msg.argList.at(0) << ")" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
@@ -118,7 +67,7 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
         handleLookupTable.insert(
             {handle, {ipv4Addr, ports, {}}}); // All else no errors, register client
 
-        sendReturnCode(clientAddress, Protocol::ReturnCode::SUCCESS);
+        socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::SUCCESS);
     }
     break;
 
@@ -137,7 +86,7 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
         for (const auto &i : handleLookupTable)
             registeredHandles.push_back(i.first); // Append all the handles registered in vector
 
-        sendReturnCode(clientAddress, Protocol::ReturnCode::ARBITRARY, registeredHandles);
+        socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::ARBITRARY, registeredHandles);
     }
     break;
 
@@ -146,27 +95,27 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
         // Follow arg list: [original handle] [handle to follow]
         // Return: SUCCESS if possible, FAILURE if not registered
 
-        if (message.argList.size() < 2)
+        if (response.msg.argList.size() < 2)
         {
-            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " sent malformed [follow] request" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " sent malformed [follow] request" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
             break;
         }
 
-        std::string handle = message.argList.at(0);
-        std::string handleToFollow = message.argList.at(1);
+        std::string handle = response.msg.argList.at(0);
+        std::string handleToFollow = response.msg.argList.at(1);
 
         if (handleLookupTable.find(handle) == handleLookupTable.end()) // Handle was not registered (iterator reaches the end of the map)
         {
-            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " attempted to [follow] with a handle that was not already registered (" << handle << ")" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " attempted to [follow] with a handle that was not already registered (" << handle << ")" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
         if (handleLookupTable.find(handleToFollow) == handleLookupTable.end()) // Handle to follow was not registered
         {
-            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " attempted to [follow] a handle that was not already registered (" << handleToFollow << ")" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " attempted to [follow] a handle that was not already registered (" << handleToFollow << ")" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
@@ -179,7 +128,7 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
         handleUserInformation.followers.insert(it, handleToFollow); // Insert into the sorted vector
 
         // Inform console
-        std::cout << "Sucessfully added follower (@" << handleToFollow << ") to @" << handle << std::endl;
+        std::cout << "Successfully added follower (@" << handleToFollow << ") to @" << handle << std::endl;
         std::cout << "Current followers of @" << handle << ": ";
         for (const auto i : handleLookupTable.at(handle).followers)
         {
@@ -187,7 +136,7 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
         }
         std::cout << std::endl;
 
-        sendReturnCode(clientAddress, Protocol::ReturnCode::SUCCESS);
+        socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::SUCCESS);
     }
     break;
 
@@ -198,29 +147,29 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
         // Follow arg list: [original handle] [handle to drop]
         // Return: SUCCESS if possible, FAILURE if not registered
 
-        if (message.argList.size() < 2)
+        if (response.msg.argList.size() < 2)
         {
-            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " sent malformed [drop] request" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " sent malformed [drop] request" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
             break;
         }
 
-        std::string handle = message.argList.at(0);
-        std::string handleToDrop = message.argList.at(1);
+        std::string handle = response.msg.argList.at(0);
+        std::string handleToDrop = response.msg.argList.at(1);
 
         if (handleLookupTable.find(handle) == handleLookupTable.end()) // Handle was not registered (iterator reaches the end of the map)
         {
-            std::cout << "Client: @" << handle << " (" << inet_ntoa(clientAddress.sin_addr) << ") "
+            std::cout << "Client: @" << handle << " (" << inet_ntoa(response.clientAddress.sin_addr) << ") "
                       << "attempted to [drop] with a handle that was not already registered (" << handle << ")" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
         if (handleLookupTable.find(handleToDrop) == handleLookupTable.end()) // Handle to follow was not registered
         {
-            std::cout << "Client: @" << handle << " (" << inet_ntoa(clientAddress.sin_addr) << ") "
+            std::cout << "Client: @" << handle << " (" << inet_ntoa(response.clientAddress.sin_addr) << ") "
                       << "attempted to [drop] a handle that was not already registered (" << handleToDrop << ")" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
@@ -228,9 +177,9 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
 
         if (std::find(handleFollowers.begin(), handleFollowers.end(), handleToDrop) == handleFollowers.end())
         { // Check if handle to drop is actually being followed by the client
-            std::cout << "Client: @" << handle << " (" << inet_ntoa(clientAddress.sin_addr) << ") "
+            std::cout << "Client: @" << handle << " (" << inet_ntoa(response.clientAddress.sin_addr) << ") "
                       << "attempted to [drop] a handle that it was not already following (" << handleToDrop << ")" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
@@ -243,7 +192,7 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
             handleFollowers.end());
 
         // Inform console
-        std::cout << "Sucessfully dropped follower (@" << handleToDrop << ") of @" << handle << std::endl;
+        std::cout << "Successfully dropped follower (@" << handleToDrop << ") of @" << handle << std::endl;
         std::cout << "Current followers of @" << handle << ": ";
         for (const auto i : handleLookupTable.at(handle).followers)
         {
@@ -251,7 +200,7 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
         }
         std::cout << std::endl;
 
-        sendReturnCode(clientAddress, Protocol::ReturnCode::SUCCESS);
+        socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::SUCCESS);
     }
     break;
 
@@ -260,20 +209,20 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
         // Removes a client's handle from the registry
         // Args: [handle to be removed]
 
-        if (message.argList.size() < 1)
+        if (response.msg.argList.size() < 1)
         {
-            std::cout << "Client: " << inet_ntoa(clientAddress.sin_addr) << " sent malformed [exit] request" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " sent malformed [exit] request" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
             break;
         }
 
-        std::string handleToDrop = message.argList.at(0);
+        std::string handleToDrop = response.msg.argList.at(0);
 
         if (handleLookupTable.find(handleToDrop) == handleLookupTable.end()) // Handle was not registered (iterator reaches the end of the map)
         {
-            std::cout << "Client: @" << handleToDrop << " (" << inet_ntoa(clientAddress.sin_addr) << ") "
+            std::cout << "Client: @" << handleToDrop << " (" << inet_ntoa(response.clientAddress.sin_addr) << ") "
                       << "attempted to [exit] with a handle that was not already registered (" << handleToDrop << ")" << std::endl;
-            sendReturnCode(clientAddress, Protocol::ReturnCode::FAILURE);
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
             break;
         }
 
@@ -286,7 +235,7 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
         {
             auto &handleFollowers = (registeredHandle.second).followers; // Directly get the string vector from the K-V pair
 
-            if (std::find(handleFollowers.begin(), handleFollowers.end(), handleToDrop) == handleFollowers.end()) // Skip if the currently iterated handle doesn't contain the to-be-removed-handle. Techincally when passing in a value that doesn't exist to the remove-erase idiom it produces undefined behavior for the vector<T>::erase, during testing it just silently failed but just to make sure
+            if (std::find(handleFollowers.begin(), handleFollowers.end(), handleToDrop) == handleFollowers.end()) // Skip if the currently iterated handle doesn't contain the to-be-removed-handle. Technically when passing in a value that doesn't exist to the remove-erase idiom it produces undefined behavior for the vector<T>::erase, during testing it just silently failed but just to make sure
                 continue;
 
             // Remove element matching the follower to be dropped's handle from the table
@@ -300,14 +249,14 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
 
         /*
          * TODO: Remove state of logical ring of exiting handle
-         *      Should recieve a 'exit-complete' command from the client
+         *      Should receive a 'exit-complete' command from the client
          */
 
         handleLookupTable.erase( // Remove exiting-handle from the list of registered clients
             handleLookupTable.find(handleToDrop));
 
         // Inform console
-        std::cout << "Sucessfully processed handle (@" << handleToDrop << ") exit" << std::endl;
+        std::cout << "Successfully processed handle (@" << handleToDrop << ") exit" << std::endl;
         std::cout << "Remaining registered handles: ";
         for (const auto &i : handleLookupTable)
         {
@@ -315,12 +264,12 @@ void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientA
         }
         std::cout << std::endl;
 
-        sendReturnCode(clientAddress, Protocol::ReturnCode::SUCCESS);
+        socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::SUCCESS);
     }
     break;
 
     default:
-        std::cout << "Command not implimented!" << std::endl;
+        std::cout << "Command not implemented!" << std::endl;
         break;
     }
 }
