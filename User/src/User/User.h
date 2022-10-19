@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <algorithm>
 
-#include "Common/Structures.h"
+#include "Common/Protocol.h"
 
 class User
 {

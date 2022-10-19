@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 
-#include "Common/Structures.h"
+#include "Common/Protocol.h"
 #include "User/User.h"
 
 int main(int argc, char *argv[])
