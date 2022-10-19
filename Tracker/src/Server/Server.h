@@ -9,11 +9,11 @@
 
 #include "Common/Structures.h"
 
-class Server
+class Tracker
 {
 public:
-    Server(int serverPort);
-    ~Server() { close(sock); }
+    Tracker(int serverPort);
+    ~Tracker() { close(sock); }
     void run();
 
 private:

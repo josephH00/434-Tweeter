@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
         std::exit(1);
     }
 
-    Server tracker(
+    Tracker tracker(
         std::atoi(argv[1]));
 
     tracker.run();

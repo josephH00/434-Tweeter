@@ -1,6 +1,6 @@
 #include "Server.h"
 
-Server::Server(int serverPort)
+Tracker::Tracker(int serverPort)
 {
 
     this->serverPort = serverPort;
@@ -22,7 +22,7 @@ Server::Server(int serverPort)
     std::cout << "Server is listening on port " << serverPort << std::endl;
 }
 
-void Server::run()
+void Tracker::run()
 {
     while (true)
     {
@@ -43,13 +43,13 @@ void Server::run()
     }
 }
 
-void Server::dieWithError(const char *errorMessage) // External error handling function
+void Tracker::dieWithError(const char *errorMessage) // External error handling function
 {
     perror(errorMessage);
     std::exit(1);
 }
 
-void Server::sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::vector<std::string> additionalData = std::vector<std::string>())
+void Tracker::sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode code, std::vector<std::string> additionalData = std::vector<std::string>())
 {
     std::vector<std::string> args = {
         Protocol::ReturnCodeToStrMap.at(code) // Serializes the enum to a string
@@ -74,7 +74,7 @@ void Server::sendReturnCode(sockaddr_in &clientAddress, Protocol::ReturnCode cod
         clientAddress);
 }
 
-void Server::parseClientMessage(Protocol::Message message, sockaddr_in &clientAddress)
+void Tracker::parseClientMessage(Protocol::Message message, sockaddr_in &clientAddress)
 {
     switch (message.command)
     {
