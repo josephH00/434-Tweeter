@@ -3,7 +3,7 @@
 TARGET_EXEC ?= user.out
 
 BUILD_DIR ?= ./build
-SRC_DIRS ?= ./src ../Common
+SRC_DIRS ?= ./src $(abspath ../Common)
 
 SRCS := $(shell find $(SRC_DIRS) -name *.cpp -or -name *.c -or -name *.s)
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)

@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <cstring>
 #include <iostream>
 #include <sstream>
 
@@ -156,7 +157,7 @@ namespace Protocol
             if (sendto(
                     socketFD,
                     cStrFormattedData,
-                    strlen(cStrFormattedData),
+                    std::strlen(cStrFormattedData),
                     0,
                     (sockaddr *)&address,
                     sizeof(address)) != strlen(cStrFormattedData))
