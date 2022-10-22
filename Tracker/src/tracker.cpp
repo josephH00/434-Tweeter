@@ -2,6 +2,7 @@
 #include <cstdlib>
 
 #include "Tracker/Tracker.h"
+#include "Common/TestingAutomation.h"
 
 int main(int argc, char *argv[])
 {
@@ -10,6 +11,10 @@ int main(int argc, char *argv[])
         std::cout << "Usage: " << argv[0] << "[Server Port Number]" << std::endl;
         std::exit(1);
     }
+
+#ifdef __DEBUG
+    TestingAutomation::feedSTDINWithFileInput(TestingAutomation::trackerInputFile);
+#endif
 
     Tracker tracker(
         std::atoi(argv[1]));

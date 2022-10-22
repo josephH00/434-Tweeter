@@ -14,6 +14,11 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -std=c++17
 
+DEBUG ?= 0
+ifeq (DEBUG, 1)
+    CPPFLAGS += -D__DEBUG -g
+endif
+
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
 
@@ -34,7 +39,6 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 
 
 .PHONY: clean
-
 clean:
 	$(RM) -r $(BUILD_DIR)
 
