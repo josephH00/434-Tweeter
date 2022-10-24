@@ -78,16 +78,9 @@ namespace P2PClientServer
         std::string serializedLogicalRing;
         for (LogicalRingInstance lri : thisLogicalRingTable)
         {
-            std::cout << lri.handle << " " << lri.ipv4Addr << " " << lri.serverPort << std::endl;
             serializedLogicalRing.append(lri.serialize());
             serializedLogicalRing.append(",");
         }
-
-        std::cout << "i " << i << std::endl;
-        std::cout << "pti " << previousTupleIndex << std::endl;
-        std::cout << "nti " << nextTupleIndex << std::endl;
-
-        std::cout << "first follower ifno " << firstFollower.handle << " " << firstFollower.ipv4Addr << " " << firstFollower.serverPort << std::endl;
 
         trackerLogicalRingInfo.unlock();
 
@@ -118,10 +111,6 @@ namespace P2PClientServer
         int previousFollowerIndex = std::stoi(messageData.at(2));
         int nextFollowerIndex = std::stoi(messageData.at(3));
 
-        std::cout << "fi " << followerIndex << std::endl;
-        std::cout << "pfi " << previousFollowerIndex << std::endl;
-        std::cout << "nfi " << nextFollowerIndex << std::endl;
-
         // Deserialize data
         std::vector<LogicalRingInstance> tmp;
 
@@ -134,12 +123,11 @@ namespace P2PClientServer
             if (substr != "")
             {
                 LogicalRingInstance i;
-                std::cout << substr << std::endl;
                 i.deserialize(substr); // The serialized LR info
                 tmp.push_back(i);
             }
         }
-        std::cout << "ss" << std::endl;
+
         const auto &initialUserInfo = tmp.at(0); // The user originating the logical ring
         if (nextFollowerIndex == 1)
         { // The ring has wrapped around to the original handle, exit
@@ -172,11 +160,6 @@ namespace P2PClientServer
         int previousTupleIndex = modulo(i - 1, thisLogicalRingTable.size() - 1); // Remove +1 because size() is 1-indexed & not 0-indexed
         int nextTupleIndex = modulo(i + 1, thisLogicalRingTable.size());
 
-        std::cout << "i " << i << std::endl;
-        std::cout << "pti " << previousTupleIndex << std::endl;
-        std::cout << "nti " << nextTupleIndex << std::endl;
-        std::cout << "next follower ifno " << nextFollower.handle << " " << nextFollower.ipv4Addr << " " << nextFollower.serverPort << std::endl;
-
         std::string updatedSerializedLogicalRing;
         for (LogicalRingInstance lri : thisLogicalRingTable)
         {
@@ -193,7 +176,7 @@ namespace P2PClientServer
                 std::to_string(i),
                 std::to_string(previousTupleIndex),
                 std::to_string(nextTupleIndex)}};
-        std::cout << "cs" << std::endl;
+
         createClientSocket(nextFollower.ipv4Addr.c_str(), nextFollower.serverPort);
         m.sendMessage(socket, targetAddress);
         close(socket);

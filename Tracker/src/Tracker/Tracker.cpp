@@ -312,7 +312,7 @@ void Tracker::parseClientMessage(SocketServer::Response response)
             break;
         }
 
-        std::vector<std::string> followersList;
+        std::vector<std::string> followersList  = {};
 
         // Insert the calling-handle's information to send back to for constructing the logical ring
         followersList.push_back(
@@ -331,7 +331,7 @@ void Tracker::parseClientMessage(SocketServer::Response response)
             bool userIsFollowingHandle = (std::find(uEntry.followers.begin(), uEntry.followers.end(), handle) != uEntry.followers.end()); // Find if another other user is following the handle-about-to-tweet
             if (!userIsFollowingHandle)                                                                                                   // If the user doesn't follow them, skip
                 continue;
-
+            std::cout << uHandle << " " << handleLookupTable[uHandle].ipv4Addr << " " << handleLookupTable[uHandle].P2PServerPorts.at(0) << std::endl;
             followersList.push_back(
                 P2PClientServer::LogicalRingInstance(
                     uHandle,                                        // The user's handle
