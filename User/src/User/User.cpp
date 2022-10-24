@@ -77,7 +77,7 @@ void User::run()
         // Start the P2P server after successfully registering
         if (m.command == Protocol::TrackerClientCommands::Register && strResponseCode == Protocol::ReturnCodeToStrMap.at(Protocol::ReturnCode::SUCCESS))
         {
-            P2PCS.start(std::stoi(m.argList.at(2))); // Third argument is the port#
+            P2PCS.start(std::stoi(m.argList.at(2)), serverIP, serverPort); // Third argument is the port#
         }
 
         // Create/modify ring
@@ -86,7 +86,7 @@ void User::run()
             std::vector<std::string> trackerInfo = response.argList;
             trackerInfo.erase(trackerInfo.begin()); // Remove 'Arbitrary' tag from data
 
-            P2PCS.sendTweet(m.argList.at(1),trackerInfo);
+            P2PCS.sendTweet(m.argList.at(1), trackerInfo);
         }
     }
 }

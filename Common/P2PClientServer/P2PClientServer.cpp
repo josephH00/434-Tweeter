@@ -1,9 +1,11 @@
 #include "P2PClientServer.h"
 namespace P2PClientServer
 {
-    void P2PClientServer::start(int P2PServerPort)
+    void P2PClientServer::start(int P2PServerPort, const char* trackerIP, int trackerPort)
     {
         this->P2PServerPort = P2PServerPort;
+        this->trackerIP = trackerIP;
+        this->trackerPort = trackerPort;
 
         std::thread mainLoopThread(&P2PClientServer::serverMainLoop, this); // Start thread
         mainLoopThread.detach();
@@ -211,6 +213,8 @@ namespace P2PClientServer
 
         m.sendMessage(socket, targetAddress);
         close(socket); // Close to reuse netf
+
+        return false;
     }
 
     bool P2PClientServer::continuePropTweet(std::vector<std::string> messageData)
@@ -268,15 +272,28 @@ namespace P2PClientServer
 
             if (r.msg.command == Protocol::TrackerClientCommands::P2PSendTweet)
             {
-                std::cout << "Got P2P Tweet" << std::endl;
                 std::string originatorHandle = r.msg.argList.at(0);
-
-                std::cout << "From: " << originatorHandle << std::endl;
+                int lastFollowerIndex = std::stoi(r.msg.argList.at(1)); //Keeps track of the last user to forward the tweet
+                std::string lastFollowerHandle = handleLookupLogicalRingInfo.at(originatorHandle).logicalRingTable.at(lastFollowerIndex).handle;
+                std::cout << "[Got P2P Tweet]" << std::endl;
+                
+                std::cout << "From: " << lastFollowerHandle << std::endl;
                 std::cout << "Msg: " << r.msg.argList.at(2) << std::endl;
 
+                //If the tweet has returned back to the original sender let the Tracker know
                 bool hasTweetReturnedToBeginning = continuePropTweet(r.msg.argList);
-                if (hasTweetReturnedToBeginning)
-                    std::cout << "completed" << std::endl;
+                if (hasTweetReturnedToBeginning) {
+                    Protocol::Message m = {
+                        .command = Protocol::TrackerClientCommands::EndTweet,
+                        .argList = {r.msg.argList.at(0)} // The original handle sending the tweet
+                    };
+                    
+                    createClientSocket(trackerIP, trackerPort);
+                    m.sendMessage(socket, targetAddress);
+                    close(socket);
+
+                    continue;
+                }
             }
         }
     }

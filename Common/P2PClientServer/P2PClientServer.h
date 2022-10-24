@@ -64,7 +64,7 @@ namespace P2PClientServer
     class P2PClientServer
     {
     public:
-        void start(int P2PServerPort);
+        void start(int P2PServerPort, const char* trackerIP, int trackerPort);
 
         void createClientSocket(const char *targetIPAddress, int targetPort);
 
@@ -76,6 +76,9 @@ namespace P2PClientServer
         unsigned short targetPort;
         const char *targetIP;
         void dieWithError(const char *errorMessage);
+
+        const char* trackerIP;
+        int trackerPort;
 
         int P2PServerPort;
         std::unique_ptr<SocketServer::Server> server;

@@ -323,7 +323,7 @@ void Tracker::parseClientMessage(SocketServer::Response response)
                 .serialize());
 
         // Find all users who are following the user-who-is-about-to-send-a-tweet
-        for (const auto& [uHandle, uEntry] : handleLookupTable)
+        for (const auto &[uHandle, uEntry] : handleLookupTable)
         {
             if (uHandle == handle) // Skip if it's the user who is sending the tweet
                 continue;
@@ -341,7 +341,32 @@ void Tracker::parseClientMessage(SocketServer::Response response)
                     .serialize());
         }
 
+        userEntry.tweetInProgress = true;
+
         socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::ARBITRARY, followersList);
+    }
+    break;
+
+    case Protocol::TrackerClientCommands::EndTweet:
+    {
+        if (response.msg.argList.size() < 1)
+        {
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " sent malformed [end-tweet] request" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
+            break;
+        }
+
+        std::string handle = response.msg.argList.at(0);
+        if (handleLookupTable.at(handle).tweetInProgress == false)
+        {
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " attempted to end a tweet that did not start" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
+            break;
+        }
+
+        handleLookupTable.at(handle).tweetInProgress = false;
+
+        socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::SUCCESS);
     }
     break;
 
