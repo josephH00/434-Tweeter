@@ -19,6 +19,7 @@ namespace P2PClientServer
         std::string handle;
         std::string ipv4Addr;
         int serverPort;
+        int indexNumber;
 
         LogicalRingInstance(std::string _handle, std::string _ipv4Addr, int _port) : handle(_handle), ipv4Addr(_ipv4Addr), serverPort(_port) {}
         LogicalRingInstance() : handle{}, ipv4Addr{}, serverPort{} {}
@@ -86,7 +87,8 @@ namespace P2PClientServer
         std::mutex tweetInProgressMessageMutex;
 
         void createLogicalRing(std::vector<std::string> serializedData); // Impliment updating
-        bool propTweet(std::vector<std::string> messageData);            // Propigate tweet throughout ring
+        bool startPropTweet(std::vector<std::string> messageData);            // Propigate tweet throughout ring
+        bool continuePropTweet(std::vector<std::string> messageData);
 
         /**
          * @brief Handles the SetupLogicalRing server command and propagates the previously created ring
