@@ -1,7 +1,7 @@
 #include "P2PClientServer.h"
 namespace P2PClientServer
 {
-    void P2PClientServer::start(int P2PServerPort, const char* trackerIP, int trackerPort)
+    void P2PClientServer::start(int P2PServerPort, const char *trackerIP, int trackerPort)
     {
         this->P2PServerPort = P2PServerPort;
         this->trackerIP = trackerIP;
@@ -54,23 +54,26 @@ namespace P2PClientServer
             handleLookupLogicalRingInfo.at(initialUserInfo.handle).clear();
         }*/
         handleLookupLogicalRingInfo.insert_or_assign(initialUserInfo.handle,
-                                                     LRLookupEntry{.logicalRingTable = tmp});
+                                                     LRLookupEntry{
+                                                        .followerIndex = 0,
+                                                        .previousFollowerIndex = (int)tmp.size() - 1,
+                                                        .nextFollowerIndex = 1,
+
+                                                        .logicalRingTable = tmp});
 
         ///////////////////////////////////
         auto &thisLogicalRing = handleLookupLogicalRingInfo.at(initialUserInfo.handle);
-        thisLogicalRing.followerIndex = 0;
-        thisLogicalRing.nextFollowerIndex = 1;
-        thisLogicalRing.previousFollowerIndex = tmp.size() - 1;
+        
 
         const auto &thisLogicalRingTable = handleLookupLogicalRingInfo.at(initialUserInfo.handle).logicalRingTable;
 
         // Send setup command to the first follower on the list
         const auto &firstFollower = thisLogicalRingTable.at(1);
-        createClientSocket(firstFollower.ipv4Addr.c_str(), firstFollower.serverPort);
 
         int i = 1;
         int previousTupleIndex = (i - 1) % (thisLogicalRingTable.size() + 1);
         int nextTupleIndex = (i + 1) % (thisLogicalRingTable.size() + 1);
+
 
         std::string serializedLogicalRing;
         for (LogicalRingInstance lri : thisLogicalRingTable)
@@ -79,6 +82,12 @@ namespace P2PClientServer
             serializedLogicalRing.append(lri.serialize());
             serializedLogicalRing.append(",");
         }
+
+        std::cout << "i " << i << std::endl;
+        std::cout << "pti " << previousTupleIndex << std::endl;
+        std::cout << "nti " << nextTupleIndex << std::endl;
+
+        std::cout << "first follower ifno " << firstFollower.handle << " " << firstFollower.ipv4Addr << " " << firstFollower.serverPort << std::endl;
 
         trackerLogicalRingInfo.unlock();
 
@@ -89,8 +98,9 @@ namespace P2PClientServer
                 std::to_string(i),
                 std::to_string(previousTupleIndex),
                 std::to_string(nextTupleIndex)}};
-
+        createClientSocket(firstFollower.ipv4Addr.c_str(), firstFollower.serverPort);
         m.sendMessage(socket, targetAddress);
+        close(socket);
     }
 
     int P2PClientServer::modulo(int x, int N)
@@ -100,6 +110,7 @@ namespace P2PClientServer
 
     bool P2PClientServer::propLogicalRing(std::vector<std::string> messageData)
     {
+
         trackerLogicalRingInfo.lock();
 
         std::string serializedLogicalRing = messageData.at(0);
@@ -107,11 +118,15 @@ namespace P2PClientServer
         int previousFollowerIndex = std::stoi(messageData.at(2));
         int nextFollowerIndex = std::stoi(messageData.at(3));
 
+        std::cout << "fi " << followerIndex << std::endl;
+        std::cout << "pfi " << previousFollowerIndex << std::endl;
+        std::cout << "nfi " << nextFollowerIndex << std::endl;
+
         // Deserialize data
         std::vector<LogicalRingInstance> tmp;
 
         std::stringstream ss(serializedLogicalRing);
-
+        
         while (ss.good())
         {
             std::string substr;
@@ -119,15 +134,18 @@ namespace P2PClientServer
             if (substr != "")
             {
                 LogicalRingInstance i;
+                std::cout << substr << std::endl;
                 i.deserialize(substr); // The serialized LR info
                 tmp.push_back(i);
             }
         }
-
+        std::cout << "ss" << std::endl;
         const auto &initialUserInfo = tmp.at(0); // The user originating the logical ring
-
-        if (nextFollowerIndex == 1) // The ring has wrapped around to the original handle, exit
+        if (nextFollowerIndex == 1)
+        { // The ring has wrapped around to the original handle, exit
+            trackerLogicalRingInfo.unlock();
             return true;
+        }
 
         /*
                 // TODO: implement updating ring ///////////////////////
@@ -149,11 +167,15 @@ namespace P2PClientServer
         const auto &thisLogicalRingTable = handleLookupLogicalRingInfo.at(initialUserInfo.handle).logicalRingTable;
         // Send setup command to the next follower on the list
         const auto &nextFollower = thisLogicalRingTable.at(nextFollowerIndex);
-        createClientSocket(nextFollower.ipv4Addr.c_str(), nextFollower.serverPort);
 
         int i = nextFollowerIndex;                                               // Send information about the next one
         int previousTupleIndex = modulo(i - 1, thisLogicalRingTable.size() - 1); // Remove +1 because size() is 1-indexed & not 0-indexed
         int nextTupleIndex = modulo(i + 1, thisLogicalRingTable.size());
+
+        std::cout << "i " << i << std::endl;
+        std::cout << "pti " << previousTupleIndex << std::endl;
+        std::cout << "nti " << nextTupleIndex << std::endl;
+        std::cout << "next follower ifno " << nextFollower.handle << " " << nextFollower.ipv4Addr << " " << nextFollower.serverPort << std::endl;
 
         std::string updatedSerializedLogicalRing;
         for (LogicalRingInstance lri : thisLogicalRingTable)
@@ -163,7 +185,7 @@ namespace P2PClientServer
         }
 
         trackerLogicalRingInfo.unlock();
-
+        
         Protocol::Message m = {
             .command = Protocol::TrackerClientCommands::SetupLogicalRing,
             .argList = {
@@ -171,7 +193,8 @@ namespace P2PClientServer
                 std::to_string(i),
                 std::to_string(previousTupleIndex),
                 std::to_string(nextTupleIndex)}};
-
+        std::cout << "cs" << std::endl;
+        createClientSocket(nextFollower.ipv4Addr.c_str(), nextFollower.serverPort);
         m.sendMessage(socket, targetAddress);
         close(socket);
 
@@ -202,7 +225,6 @@ namespace P2PClientServer
         const auto &thisLogicalRing = handleLookupLogicalRingInfo.at(initialUserInfo.handle);
 
         const auto &nextFollower = thisLogicalRing.logicalRingTable.at(thisLogicalRing.nextFollowerIndex);
-        createClientSocket(nextFollower.ipv4Addr.c_str(), nextFollower.serverPort);
 
         Protocol::Message m = {
             .command = Protocol::TrackerClientCommands::P2PSendTweet,
@@ -211,6 +233,7 @@ namespace P2PClientServer
                 std::to_string(thisLogicalRing.followerIndex),
                 tweetInProgressMessage}};
 
+        createClientSocket(nextFollower.ipv4Addr.c_str(), nextFollower.serverPort);
         m.sendMessage(socket, targetAddress);
         close(socket); // Close to reuse netf
 
@@ -229,7 +252,6 @@ namespace P2PClientServer
             return true; // Came back around
 
         const auto &nextFollower = thisLogicalRing.logicalRingTable.at(thisLogicalRing.nextFollowerIndex);
-        createClientSocket(nextFollower.ipv4Addr.c_str(), nextFollower.serverPort);
 
         Protocol::Message m = {
             .command = Protocol::TrackerClientCommands::P2PSendTweet,
@@ -239,6 +261,7 @@ namespace P2PClientServer
                 tweetMessage                                   // The message itself
             }};
 
+        createClientSocket(nextFollower.ipv4Addr.c_str(), nextFollower.serverPort);
         m.sendMessage(socket, targetAddress);
         close(socket); // Close to reuse netf
 
@@ -263,7 +286,7 @@ namespace P2PClientServer
             SocketServer::Response r = server->getIncomingBlockingMessage();
             if (r.msg.command == Protocol::TrackerClientCommands::SetupLogicalRing)
             {
-                std::cout << "Got logical ring setup cmd" << std::endl;
+                std::cout << "[P2P] Got Logical Ring Setup command" << std::endl;
                 bool hasReturnedToBeginning = propLogicalRing(r.msg.argList);
 
                 if (hasReturnedToBeginning)
@@ -273,21 +296,22 @@ namespace P2PClientServer
             if (r.msg.command == Protocol::TrackerClientCommands::P2PSendTweet)
             {
                 std::string originatorHandle = r.msg.argList.at(0);
-                int lastFollowerIndex = std::stoi(r.msg.argList.at(1)); //Keeps track of the last user to forward the tweet
+                int lastFollowerIndex = std::stoi(r.msg.argList.at(1)); // Keeps track of the last user to forward the tweet
                 std::string lastFollowerHandle = handleLookupLogicalRingInfo.at(originatorHandle).logicalRingTable.at(lastFollowerIndex).handle;
                 std::cout << "[Got P2P Tweet]" << std::endl;
-                
+
                 std::cout << "From: " << lastFollowerHandle << std::endl;
                 std::cout << "Msg: " << r.msg.argList.at(2) << std::endl;
 
-                //If the tweet has returned back to the original sender let the Tracker know
+                // If the tweet has returned back to the original sender let the Tracker know
                 bool hasTweetReturnedToBeginning = continuePropTweet(r.msg.argList);
-                if (hasTweetReturnedToBeginning) {
+                if (hasTweetReturnedToBeginning)
+                {
                     Protocol::Message m = {
                         .command = Protocol::TrackerClientCommands::EndTweet,
                         .argList = {r.msg.argList.at(0)} // The original handle sending the tweet
                     };
-                    
+
                     createClientSocket(trackerIP, trackerPort);
                     m.sendMessage(socket, targetAddress);
                     close(socket);

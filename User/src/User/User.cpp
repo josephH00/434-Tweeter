@@ -35,6 +35,8 @@ void User::run()
         std::string userInput;
         std::getline(std ::cin, userInput); // Get user input from STDIN
 
+        if (userInput == "")
+            continue;
         Protocol::Message m;
         if (!m.parseIncoming(userInput, ' ')) // If there is an error parsing the user's input, let them know
         {
