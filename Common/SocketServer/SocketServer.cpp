@@ -3,13 +3,16 @@
 namespace SocketServer
 {
 
-    Server::Server(int serverPort)
+    Server::Server(int serverPort, bool blockingMode = true)
     {
         this->serverPort = serverPort;
 
         // Create socket for sending/receiving datagrams
         if ((socket = ::socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
             dieWithError("server: socket() failed");
+
+        if(blockingMode == false)
+            fcntl(socket, F_SETFL, O_NONBLOCK);
 
         // Construct local address structure
         memset(&serverAddress, 0, sizeof(serverAddress));  // Zero out structure

@@ -2,7 +2,7 @@
 
 Tracker::Tracker(int serverPort)
 {
-    socketServer = std::make_unique<SocketServer::Server>(serverPort);
+    socketServer = std::make_unique<SocketServer::Server>(serverPort, true);
 }
 
 void Tracker::run()
@@ -65,7 +65,7 @@ void Tracker::parseClientMessage(SocketServer::Response response)
 
         // If a client with the same ipv4 address arg registers it faults, todo: Fix
         handleLookupTable.insert(
-            {handle, {ipv4Addr, ports, {}}}); // All else no errors, register client
+            {handle, {.ipv4Addr = ipv4Addr, .P2PServerPorts = ports, .followers = {}, .tweetInProgress = false}}); // All else no errors, register client
 
         socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::SUCCESS);
     }
@@ -265,6 +265,83 @@ void Tracker::parseClientMessage(SocketServer::Response response)
         std::cout << std::endl;
 
         socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::SUCCESS);
+    }
+    break;
+
+    case Protocol::TrackerClientCommands::Tweet:
+    {
+        // Returns all the users that follow the handle
+
+        // Arg list: [handle] [message]
+        // Return: ARBITRARY if possible, FAILURE if not not registered or empty tweet
+        //      "b64[userHandle],b64[userIP],b64[userP2PServerPort]","b64[follower1Handle],b64[follower2IP],b64[follower2P2PServerPort]", ...
+
+        if (response.msg.argList.size() < 2)
+        {
+            std::cout << "Client: " << inet_ntoa(response.clientAddress.sin_addr) << " sent malformed [tweet] request" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE); // The amount of arguments the client is trying to follow with is less than the required
+            break;
+        }
+
+        std::string handle = response.msg.argList.at(0);
+        std::string tweetMessage = response.msg.argList.at(1);
+
+        if (handleLookupTable.find(handle) == handleLookupTable.end()) // Handle was not registered (iterator reaches the end of the map)
+        {
+            std::cout << "Client: @" << handle << " (" << inet_ntoa(response.clientAddress.sin_addr) << ") "
+                      << "attempted to [tweet] with a handle that was not already registered (" << handle << ")" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
+            break;
+        }
+
+        if (tweetMessage.length() == 0 || tweetMessage.length() > 140) // Tweet was empty or over max characters
+        {
+            std::cout << "Client: @" << handle << " (" << inet_ntoa(response.clientAddress.sin_addr) << ") "
+                      << "attempted to [tweet] with an invalid message length of (" << tweetMessage.length() << ")" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
+            break;
+        }
+
+        auto &userEntry = handleLookupTable[handle]; // Directly get the string vector
+
+        if (userEntry.tweetInProgress)
+        {
+            std::cout << "Client: @" << handle << " (" << inet_ntoa(response.clientAddress.sin_addr) << ") "
+                      << "attempted to [tweet] with another tweet already in progress" << std::endl;
+            socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::FAILURE);
+            break;
+        }
+
+        std::vector<std::string> followersList;
+
+        // Insert the calling-handle's information to send back to for constructing the logical ring
+        followersList.push_back(
+            P2PClientServer::LogicalRingInstance(
+                handle,
+                userEntry.ipv4Addr,
+                userEntry.P2PServerPorts.at(0)) // There should only be one port that's registered, due to time constraints this will be reverted to one port at a later time
+                .serialize());
+
+        // Find all users who are following the user-who-is-about-to-send-a-tweet
+        for (const auto& [uHandle, uEntry] : handleLookupTable)
+        {
+            if (uHandle == handle) // Skip if it's the user who is sending the tweet
+                continue;
+
+            bool userIsFollowingHandle = (std::find(uEntry.followers.begin(), uEntry.followers.end(), handle) != uEntry.followers.end()); // Find if another other user is following the handle-about-to-tweet
+            if (!userIsFollowingHandle)                                                                                                   // If the user doesn't follow them, skip
+                continue;
+
+            followersList.push_back(
+                P2PClientServer::LogicalRingInstance(
+                    uHandle,                                        // The user's handle
+                    handleLookupTable[uHandle].ipv4Addr,            // User's IP address
+                    handleLookupTable[uHandle].P2PServerPorts.at(0) // User's P2P server port
+                    )
+                    .serialize());
+        }
+
+        socketServer->sendReturnCode(response.clientAddress, Protocol::ReturnCode::ARBITRARY, followersList);
     }
     break;
 

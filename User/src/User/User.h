@@ -6,8 +6,10 @@
 #include <unistd.h>
 #include <cstdlib>
 #include <algorithm>
+#include <thread>
 
 #include "Common/Protocol.h"
+#include "Common/P2PClientServer/P2PClientServer.h"
 
 class User
 {
@@ -26,4 +28,6 @@ private:
     const char *serverIP;      // IP address of server
 
     void dieWithError(const char *errorMessage);
+
+    P2PClientServer::P2PClientServer P2PCS;
 };

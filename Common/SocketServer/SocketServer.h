@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <cstdlib>
 #include <algorithm>
+#include <fcntl.h>
 
 #include "Common/Protocol.h"
 
@@ -28,7 +29,7 @@ namespace SocketServer
     class Server
     {
     public:
-        Server(int serverPort);
+        Server(int serverPort, bool blockingMode);
         ~Server() { close(socket); }
 
         Response getIncomingBlockingMessage();

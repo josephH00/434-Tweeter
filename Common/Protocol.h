@@ -28,7 +28,9 @@ namespace Protocol
         EndTweet,
         Exit,
         ReturnCode, // This is used for sending back information to the client about a previous operation (eg registering for the service)
-        __NotSet    // Internal value used for converting back strings to enum values
+        SetupLogicalRing, //Used in the P2P server for constructing the logical ring of followers
+        P2PSendTweet,
+        __NotSet // Internal value used for converting back strings to enum values
     };
     const std::map<TrackerClientCommands, std::string> TrackerToStrMap = {
         {TrackerClientCommands::Register, "register"},
@@ -38,7 +40,9 @@ namespace Protocol
         {TrackerClientCommands::Tweet, "tweet"},
         {TrackerClientCommands::EndTweet, "end-tweet"},
         {TrackerClientCommands::Exit, "exit"},
-        {TrackerClientCommands::ReturnCode, "return-code"}};
+        {TrackerClientCommands::ReturnCode, "return-code"},
+        {TrackerClientCommands::SetupLogicalRing, "setupLogicalRing"},
+        {TrackerClientCommands::P2PSendTweet, "P2PSendTweet"}};
 
     enum class ReturnCode
     {

@@ -30,7 +30,7 @@ void User::run()
     std::cout << "Commands arguments are delimited with a SPACE (' ')" << std::endl;
     while (true)
     {
-        std::cout << "Command> ";
+        std::cout << "Command> " << std::flush;
 
         std::string userInput;
         std::getline(std ::cin, userInput); // Get user input from STDIN
@@ -73,5 +73,20 @@ void User::run()
 
         std::cout << "-> Got response from server: " << formattedResponse << std::endl
                   << std::endl;
+
+        // Start the P2P server after successfully registering
+        if (m.command == Protocol::TrackerClientCommands::Register && strResponseCode == Protocol::ReturnCodeToStrMap.at(Protocol::ReturnCode::SUCCESS))
+        {
+            P2PCS.start(std::stoi(m.argList.at(2))); // Third argument is the port#
+        }
+
+        // Create/modify ring
+        if (m.command == Protocol::TrackerClientCommands::Tweet && strResponseCode == Protocol::ReturnCodeToStrMap.at(Protocol::ReturnCode::ARBITRARY))
+        {
+            std::vector<std::string> trackerInfo = response.argList;
+            trackerInfo.erase(trackerInfo.begin()); // Remove 'Arbitrary' tag from data
+
+            P2PCS.sendTweet(m.argList.at(1),trackerInfo);
+        }
     }
 }
